@@ -2,10 +2,6 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
-@app.get("/test")
-def read_root():
-    return {"Hello": "World"}
-
 # Only run uvicorn if this file is executed directly
 if __name__ == "__main__":
     import uvicorn
