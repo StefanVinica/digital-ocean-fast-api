@@ -1,11 +1,6 @@
-fastapi
-uvicorn
-requests
-gunicorn
-Jinja2
-libcairo2
-libpangoft2-1.0-0
-libjpeg62-turbo
-libopenjp2-7
-libtiff5
-WeasyPrint
+fastapi==0.95.2
+uvicorn==0.22.0
+requests==2.31.0
+gunicorn==20.1.0
+WeasyPrint==57.1
+Jinja2==3.1.2
