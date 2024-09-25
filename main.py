@@ -1,9 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, HTTPException
 import requests
 
-app = FastAPI()
+router = APIRouter()
 
-@app.get("/property/{initial_id}")
+@router.get("/property/{initial_id}")
 async def get_property(initial_id: int):
     """
     Fetch the source property and selected comparable properties based on initial_id.
