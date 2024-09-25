@@ -2,5 +2,10 @@ fastapi
 uvicorn
 requests
 gunicorn
-WeasyPrint
 Jinja2
+libcairo2
+libpangoft2-1.0-0
+libjpeg62-turbo
+libopenjp2-7
+libtiff5
+WeasyPrint
