@@ -2,9 +2,9 @@ from fastapi import APIRouter, HTTPException
 import requests
 from fastapi.responses import StreamingResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from weasyprint import HTML
 import io
 from datetime import datetime
+from playwright.async_api import async_playwright
 
 router = APIRouter()
 
@@ -76,25 +76,25 @@ async def get_property(initial_id: int):
 
 @router.get("/property/{initial_id}/report", response_class=StreamingResponse)
 async def generate_report(initial_id: int):
-    """
-    Generate a PDF report for the source property and selected comparisons.
-    """
-    # Reuse the logic from get_property to fetch data
     result = await get_property(initial_id)
-    
+
     # Render the HTML template with data
     template = env.get_template('report.html')
     html_content = template.render(
         source_property=result['source_property'],
         selected_comparisons=result['selected_comparisons']
     )
-    
-    # Generate PDF from HTML content
-    pdf = HTML(string=html_content).write_pdf()
-    
-    # Create a StreamingResponse to send the PDF file
+
+    # Generate PDF using Playwright
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        await page.set_content(html_content, wait_until='networkidle')
+        pdf_bytes = await page.pdf()
+        await browser.close()
+
     return StreamingResponse(
-        io.BytesIO(pdf),
+        io.BytesIO(pdf_bytes),
         media_type="application/pdf",
         headers={
             "Content-Disposition": f"attachment; filename=property_report_{initial_id}.pdf"
