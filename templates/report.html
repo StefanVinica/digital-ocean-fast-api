@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Property Report</title>
+    <style>
+        /* Add your CSS styles here */
+        body { font-family: Arial, sans-serif; }
+        h1 { text-align: center; }
+        .property, .comparison { margin-bottom: 20px; }
+        .property h2, .comparison h2 { border-bottom: 1px solid #ccc; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 12px; border: 1px solid #ccc; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Property Report</h1>
+
+    <div class="property">
+        <h2>Source Property</h2>
+        <p><strong>Address:</strong> {{ source_property.address }}</p>
+        <p><strong>City:</strong> {{ source_property.city }}</p>
+        <p><strong>State:</strong> {{ source_property.state }}</p>
+        <p><strong>Zip:</strong> {{ source_property.zip }}</p>
+        <p><strong>Bedrooms:</strong> {{ source_property.bedrooms }}</p>
+        <p><strong>Bathrooms:</strong> {{ source_property.bath }}</p>
+        <p><strong>Square Feet:</strong> {{ source_property.square_feet }}</p>
+        <p><strong>Appraisal Value:</strong> {{ source_property.appraisal_value }}</p>
+    </div>
+
+    <div class="comparisons">
+        <h2>Selected Comparisons</h2>
+        {% for comparison in selected_comparisons %}
+        <div class="comparison">
+            <h3>Comparison {{ loop.index }}</h3>
+            <p><strong>Address:</strong> {{ comparison.address }}</p>
+            <p><strong>Bedrooms:</strong> {{ comparison.bedrooms }}</p>
+            <p><strong>Bathrooms:</strong> {{ comparison.bath }}</p>
+            <p><strong>Floor Size:</strong> {{ comparison.floor_size_value }} {{ comparison.floor_size_unit }}</p>
+            <p><strong>Sold Amount:</strong> {{ comparison.sold_amount }}</p>
+            <p><strong>Sales Date:</strong> {{ comparison.sales_date | datetimeformat }}</p>
+            <p><strong>Description:</strong> {{ comparison.description }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

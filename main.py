@@ -1,7 +1,24 @@
 from fastapi import APIRouter, HTTPException
 import requests
+from fastapi.responses import StreamingResponse
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+from weasyprint import HTML
+import io
+from datetime import datetime
 
 router = APIRouter()
+
+# Initialize the Jinja2 environment
+env = Environment(
+    loader=FileSystemLoader('templates'),
+    autoescape=select_autoescape(['html', 'xml'])
+)
+
+# Add a custom filter to format datetime
+def datetimeformat(value, format='%Y-%m-%d'):
+    return datetime.fromtimestamp(value / 1000).strftime(format)
+
+env.filters['datetimeformat'] = datetimeformat
 
 @router.get("/property/{initial_id}")
 async def get_property(initial_id: int):
@@ -56,3 +73,30 @@ async def get_property(initial_id: int):
     }
     
     return result
+
+@router.get("/property/{initial_id}/report", response_class=StreamingResponse)
+async def generate_report(initial_id: int):
+    """
+    Generate a PDF report for the source property and selected comparisons.
+    """
+    # Reuse the logic from get_property to fetch data
+    result = await get_property(initial_id)
+    
+    # Render the HTML template with data
+    template = env.get_template('report.html')
+    html_content = template.render(
+        source_property=result['source_property'],
+        selected_comparisons=result['selected_comparisons']
+    )
+    
+    # Generate PDF from HTML content
+    pdf = HTML(string=html_content).write_pdf()
+    
+    # Create a StreamingResponse to send the PDF file
+    return StreamingResponse(
+        io.BytesIO(pdf),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=property_report_{initial_id}.pdf"
+        }
+    )
