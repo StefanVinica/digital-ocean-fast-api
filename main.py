@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 import csv
 import requests
 from fastapi.responses import StreamingResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 import io
 from datetime import datetime
+from urllib.parse import quote
 from playwright.async_api import async_playwright
 
 router = APIRouter()
@@ -109,15 +110,29 @@ async def generate_report(initial_id: int):
     )
     
 @router.get("/property/report/csv")
-async def generate_csv_report_for_all():
+async def generate_csv_report(user_email: str = Query(...), report_id: int = Query(...)):
     """
-    Generate a CSV report for all source properties that have selected comparable properties.
+    Generate a CSV report for a specific user's report containing selected comparable properties.
     """
-    # Fetch all source properties
-    properties_response = requests.get("https://xano.anant.systems/api:gqF_nDUq/ripos/valuations_property")
-    if properties_response.status_code != 200:
-        raise HTTPException(status_code=properties_response.status_code, detail="Failed to fetch properties.")
-    source_properties = properties_response.json()
+    # Fetch all user reports
+    user_reports_response = requests.get("https://xano.anant.systems/api:BKZAQvfA/ripos_valuations_user_reports")
+    if user_reports_response.status_code != 200:
+        raise HTTPException(status_code=user_reports_response.status_code, detail="Failed to fetch user reports.")
+    user_reports = user_reports_response.json()
+
+    # Find the report matching user_email and report_id
+    selected_report = next(
+        (report for report in user_reports if report['id'] == report_id and report['user_id'] == user_email),
+        None
+    )
+
+    if not selected_report:
+        raise HTTPException(status_code=404, detail="User report not found.")
+
+    # Get the property_ids from the report
+    property_ids = selected_report.get('property_ids', [])
+    if not property_ids:
+        raise HTTPException(status_code=404, detail="No property IDs found in the user report.")
 
     # Fetch all comparable properties
     comparisons_response = requests.get("https://xano.anant.systems/api:rhC7uFD7/ripos/valuations_property_comparisons")
@@ -125,8 +140,14 @@ async def generate_csv_report_for_all():
         raise HTTPException(status_code=comparisons_response.status_code, detail="Failed to fetch property comparisons.")
     all_comparisons = comparisons_response.json()
 
-    # Filter to include only selected comparisons
-    selected_comparisons_list = [comp for comp in all_comparisons if comp.get('Selected') == True]
+    # Create a mapping from comparison id to comparison data
+    comparisons_by_id = {comp['id']: comp for comp in all_comparisons}
+
+    # Filter the comparisons to only include those in property_ids
+    selected_comparisons_list = [comparisons_by_id[comp_id] for comp_id in property_ids if comp_id in comparisons_by_id]
+
+    if not selected_comparisons_list:
+        raise HTTPException(status_code=404, detail="No matching comparisons found for the given property IDs.")
 
     # Group selected comparisons by their initial_address (source property address)
     comparisons_by_initial_address = {}
@@ -134,6 +155,15 @@ async def generate_csv_report_for_all():
         initial_address = comp.get('initial_address')
         if initial_address:
             comparisons_by_initial_address.setdefault(initial_address, []).append(comp)
+
+    # Fetch all source properties
+    properties_response = requests.get("https://xano.anant.systems/api:gqF_nDUq/ripos/valuations_property")
+    if properties_response.status_code != 200:
+        raise HTTPException(status_code=properties_response.status_code, detail="Failed to fetch properties.")
+    source_properties = properties_response.json()
+
+    # Create a mapping from address to source property
+    source_properties_by_address = {prop['address']: prop for prop in source_properties}
 
     # Prepare CSV headers
     headers = [
@@ -165,15 +195,12 @@ async def generate_csv_report_for_all():
     writer = csv.writer(output)
     writer.writerow(headers)
 
-    # Process each source property
-    for source_property in source_properties:
-        # Get the initial_address to match with comparisons
-        source_address = source_property.get('address', '')
-        selected_comparisons = comparisons_by_initial_address.get(source_address, [])
-        
-        # Only proceed if there are selected comparisons
-        if not selected_comparisons:
-            continue  # Skip this source property
+    # Process each initial_address (source property)
+    for initial_address, selected_comparisons in comparisons_by_initial_address.items():
+        # Get the source property
+        source_property = source_properties_by_address.get(initial_address)
+        if not source_property:
+            continue  # Skip if source property not found
 
         # Calculate average sold amount
         sold_amounts = [
@@ -184,7 +211,7 @@ async def generate_csv_report_for_all():
         # Prepare data row
         data_row = [
             average_sold_amount,
-            source_address,
+            initial_address,
             source_property.get('bedrooms', ''),
             source_property.get('bath', ''),
             source_property.get('square_feet', ''),
@@ -214,10 +241,16 @@ async def generate_csv_report_for_all():
 
     output.seek(0)
 
+    # Sanitize email by replacing "@" and "." to avoid issues with file names
+    safe_email = user_email.replace('@', '_').replace('.', '_')
+
+    # Generate the filename
+    filename = f"property_report_{safe_email}_{report_id}.csv"
+
     return StreamingResponse(
         output,
         media_type='text/csv',
         headers={
-            'Content-Disposition': 'attachment; filename=property_report.csv'
+            'Content-Disposition': f'attachment; filename="{quote(filename)}"'
         }
     )

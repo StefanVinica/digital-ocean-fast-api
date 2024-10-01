@@ -29,3 +29,7 @@ This project is open-sourced under the MIT License. See the LICENSE file for mor
 ---
 
 Happy coding! 🎉
+
+
+## Start the app
+uvicorn app:app --reload
